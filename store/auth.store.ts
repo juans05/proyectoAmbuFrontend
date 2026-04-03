@@ -19,6 +19,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.setItem('accessToken', token)
       localStorage.setItem('user', JSON.stringify(user))
+      // Sincronizar cookie para que el middleware de Next.js pueda leerla
+      document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}` // 15 minutos
     }
     set({ token, user, isAuthenticated: true })
   },
@@ -27,6 +29,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('user')
+      // Limpiar cookie
+      document.cookie = 'accessToken=; path=/; max-age=0'
     }
     set({ token: null, user: null, isAuthenticated: false })
   },
@@ -38,10 +42,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (token && userStr) {
         try {
           const user = JSON.parse(userStr) as User
+          // Restaurar cookie si existe token en localStorage pero no en cookie
+          document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}`
           set({ token, user, isAuthenticated: true })
         } catch {
           localStorage.removeItem('accessToken')
           localStorage.removeItem('user')
+          document.cookie = 'accessToken=; path=/; max-age=0'
         }
       }
     }

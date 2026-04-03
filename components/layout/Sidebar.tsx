@@ -7,7 +7,7 @@ import {
   Map,
   AlertTriangle,
   Building2,
-  Ambulance,
+  Shield,
   Users,
   CreditCard,
   BarChart2,
@@ -22,7 +22,7 @@ const navItems = [
   { href: '/map', label: 'Mapa de Flota', icon: Map },
   { href: '/emergencies', label: 'Emergencias', icon: AlertTriangle },
   { href: '/companies', label: 'Empresas', icon: Building2 },
-  { href: '/ambulances', label: 'Ambulancias', icon: Ambulance },
+  { href: '/ambulances', label: 'Unidades', icon: Shield },
   { href: '/users', label: 'Usuarios', icon: Users },
   { href: '/subscriptions', label: 'Suscripciones', icon: CreditCard },
   { href: '/payments', label: 'Pagos', icon: BarChart2 },
@@ -44,9 +44,9 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
         <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center">
-          <Ambulance className="w-5 h-5 text-white" />
+          <Shield className="w-5 h-5 text-white" />
         </div>
-        <span className="text-xl font-bold text-orange-400">AmbuGo</span>
+        <span className="text-xl font-bold text-orange-400">TukuySOS</span>
         <span className="text-xs text-gray-400 ml-auto">Admin</span>
       </div>
 

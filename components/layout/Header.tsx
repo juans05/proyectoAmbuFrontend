@@ -7,7 +7,7 @@ interface HeaderProps {
   title?: string
 }
 
-export default function Header({ title = 'Panel de Administración' }: HeaderProps) {
+export default function Header({ title = 'TukuySOS — Gestión Integral' }: HeaderProps) {
   const user = useAuthStore((s) => s.user)
 
   return (

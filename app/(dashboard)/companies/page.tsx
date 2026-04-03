@@ -1,0 +1,260 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { Building2, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import api from '@/lib/axios'
+import { Company, PaginatedResponse } from '@/types'
+import { formatDate } from '@/lib/utils'
+
+type CompanyStatus = 'all' | 'verified' | 'pending' | 'suspended'
+
+const STATUS_LABELS: Record<string, { label: string; classes: string }> = {
+  verified: { label: 'Verificada', classes: 'bg-green-100 text-green-700 border-green-200' },
+  pending: { label: 'Pendiente', classes: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  suspended: { label: 'Suspendida', classes: 'bg-red-100 text-red-700 border-red-200' },
+}
+
+function getCompanyStatus(company: Company): 'verified' | 'pending' | 'suspended' {
+  if (company.isVerified) return 'verified'
+  return 'pending'
+}
+
+export default function CompaniesPage() {
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [filter, setFilter] = useState<CompanyStatus>('all')
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const limit = 20
+
+  const fetchCompanies = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params: Record<string, string | number> = { page, limit }
+      if (filter === 'verified') params.isVerified = 'true'
+      if (filter === 'pending') params.isVerified = 'false'
+
+      const { data } = await api.get<PaginatedResponse<Company>>('/admin/companies', { params })
+      setCompanies(data.data ?? [])
+      setTotal(data.total ?? 0)
+    } catch {
+      setCompanies([])
+      setTotal(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [filter, page])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter])
+
+  useEffect(() => {
+    fetchCompanies()
+  }, [fetchCompanies])
+
+  const handleVerify = async (companyId: string) => {
+    setActionLoading(companyId)
+    try {
+      await api.patch(`/admin/companies/${companyId}/verify`)
+      await fetchCompanies()
+    } catch {
+      // manejar silenciosamente
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSuspend = async (companyId: string) => {
+    if (!confirm('¿Estás seguro de suspender esta empresa?')) return
+    setActionLoading(companyId)
+    try {
+      await api.patch(`/admin/companies/${companyId}/suspend`)
+      await fetchCompanies()
+    } catch {
+      // manejar silenciosamente
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">Empresas de Ambulancias</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Gestión y verificación de empresas operadoras registradas en AmbuGo
+        </p>
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'all', label: 'Todas' },
+            { value: 'verified', label: 'Verificadas' },
+            { value: 'pending', label: 'Pendientes' },
+            { value: 'suspended', label: 'Suspendidas' },
+          ] as { value: CompanyStatus; label: string }[]).map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setFilter(opt.value)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                filter === opt.value
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-sm text-gray-500">
+            {loading ? 'Cargando...' : `${total} empresa${total !== 1 ? 's' : ''}`}
+          </span>
+          <button
+            onClick={fetchCompanies}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-orange-500 transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+          </div>
+        ) : companies.length === 0 ? (
+          <div className="text-center py-16 text-gray-400 text-sm">
+            No se encontraron empresas con los filtros seleccionados.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+                    Empresa
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+                    RUC
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+                    Contacto
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+                    Estado
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+                    Registro
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {companies.map((company) => {
+                  const status = getCompanyStatus(company)
+                  const statusConfig = STATUS_LABELS[status]
+                  const isActioning = actionLoading === company.id
+
+                  return (
+                    <tr key={company.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                            <Building2 className="w-4 h-4 text-orange-500" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">{company.name}</p>
+                            {company.address && (
+                              <p className="text-xs text-gray-400 truncate max-w-[200px]">{company.address}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{company.ruc}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <p>{company.email ?? '—'}</p>
+                        <p className="text-xs text-gray-400">{company.phone ?? ''}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusConfig.classes}`}
+                        >
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">
+                        {company.createdAt ? formatDate(company.createdAt) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {!company.isVerified && status !== 'suspended' && (
+                            <button
+                              onClick={() => handleVerify(company.id)}
+                              disabled={isActioning}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50 transition-colors"
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              Verificar
+                            </button>
+                          )}
+                          {status !== 'suspended' && (
+                            <button
+                              onClick={() => handleSuspend(company.id)}
+                              disabled={isActioning}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Suspender
+                            </button>
+                          )}
+                          {isActioning && (
+                            <div className="animate-spin w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Paginación */}
+        {!loading && totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Anterior
+            </button>
+            <span className="text-sm text-gray-500">
+              Página {page} de {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              Siguiente
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
