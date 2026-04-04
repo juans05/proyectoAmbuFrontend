@@ -29,7 +29,7 @@ export default function SubscriptionsPage() {
       const params: Record<string, string | number> = { page, limit }
       if (statusFilter !== 'all') params.status = statusFilter
 
-      const { data } = await api.get<PaginatedResponse<Subscription>>('/admin/subscriptions', { params })
+      const { data } = await api.get<PaginatedResponse<Subscription>>('/subscriptions', { params })
       setSubscriptions(data.data ?? [])
       setTotal(data.total ?? 0)
     } catch {

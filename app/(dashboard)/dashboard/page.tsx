@@ -6,6 +6,7 @@ import MetricCard from '@/components/dashboard/MetricCard'
 import ActiveEmergencies from '@/components/dashboard/ActiveEmergencies'
 import RevenueChart from '@/components/dashboard/RevenueChart'
 import api from '@/lib/axios'
+import { getTrackingSocket } from '@/lib/socket'
 import { DashboardMetrics, Emergency, EmergencyByHour } from '@/types'
 
 const MOCK_METRICS: DashboardMetrics = {
@@ -27,7 +28,7 @@ export default function DashboardPage() {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const { data } = await api.get<DashboardMetrics>('/admin/metrics')
+      const { data } = await api.get<DashboardMetrics>('/reports/dashboard')
       setMetrics(data)
     } catch {
       // mantener los valores actuales si falla
@@ -38,7 +39,7 @@ export default function DashboardPage() {
 
   const fetchEmergencies = useCallback(async () => {
     try {
-      const { data } = await api.get<{ data: Emergency[] }>('/admin/emergencies', {
+      const { data } = await api.get<{ data: Emergency[] }>('/emergencies', {
         params: { status: 'pending,assigned,on_route,arrived', limit: 8 },
       })
       setEmergencies(data.data ?? [])
@@ -51,8 +52,8 @@ export default function DashboardPage() {
 
   const fetchChartData = useCallback(async () => {
     try {
-      const { data } = await api.get<EmergencyByHour[]>('/admin/emergencies/by-hour')
-      setChartData(data)
+      const { data } = await api.get<EmergencyByHour[]>('/reports/response-times')
+      setChartData(Array.isArray(data) ? data : [])
     } catch {
       setChartData([])
     } finally {
@@ -65,13 +66,34 @@ export default function DashboardPage() {
     fetchEmergencies()
     fetchChartData()
 
+    // Auto-refresh cada 30 segundos
     const interval = setInterval(() => {
       fetchMetrics()
       fetchEmergencies()
       fetchChartData()
     }, 30_000)
 
-    return () => clearInterval(interval)
+    // WebSocket — actualización en tiempo real desde /tracking
+    const socket = getTrackingSocket()
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+    if (token) socket.auth = { token }
+    if (!socket.connected) socket.connect()
+
+    // Cuando una emergencia es asignada o cambia estado, refrescar la lista
+    const handleEmergencyChange = () => {
+      fetchEmergencies()
+      fetchMetrics()
+    }
+    socket.on('emergency_assigned', handleEmergencyChange)
+    socket.on('status_change', handleEmergencyChange)
+    socket.on('new_emergency', handleEmergencyChange)
+
+    return () => {
+      clearInterval(interval)
+      socket.off('emergency_assigned', handleEmergencyChange)
+      socket.off('status_change', handleEmergencyChange)
+      socket.off('new_emergency', handleEmergencyChange)
+    }
   }, [fetchMetrics, fetchEmergencies, fetchChartData])
 
   return (

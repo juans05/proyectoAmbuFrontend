@@ -26,7 +26,7 @@ export default function UsersPage() {
       const params: Record<string, string | number> = { page, limit }
       if (search) params.search = search
 
-      const { data } = await api.get<PaginatedResponse<UserWithSubscription>>('/admin/users', { params })
+      const { data } = await api.get<PaginatedResponse<UserWithSubscription>>('/users', { params })
       setUsers(data.data ?? [])
       setTotal(data.total ?? 0)
     } catch {

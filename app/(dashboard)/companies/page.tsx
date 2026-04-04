@@ -35,7 +35,7 @@ export default function CompaniesPage() {
       if (filter === 'verified') params.isVerified = 'true'
       if (filter === 'pending') params.isVerified = 'false'
 
-      const { data } = await api.get<PaginatedResponse<Company>>('/admin/companies', { params })
+      const { data } = await api.get<PaginatedResponse<Company>>('/companies', { params })
       setCompanies(data.data ?? [])
       setTotal(data.total ?? 0)
     } catch {
@@ -57,7 +57,7 @@ export default function CompaniesPage() {
   const handleVerify = async (companyId: string) => {
     setActionLoading(companyId)
     try {
-      await api.patch(`/admin/companies/${companyId}/verify`)
+      await api.put(`/companies/${companyId}/verify`)
       await fetchCompanies()
     } catch {
       // manejar silenciosamente
@@ -70,7 +70,7 @@ export default function CompaniesPage() {
     if (!confirm('¿Estás seguro de suspender esta empresa?')) return
     setActionLoading(companyId)
     try {
-      await api.patch(`/admin/companies/${companyId}/suspend`)
+      await api.put(`/companies/${companyId}/suspend`)
       await fetchCompanies()
     } catch {
       // manejar silenciosamente

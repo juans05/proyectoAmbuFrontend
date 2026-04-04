@@ -55,7 +55,7 @@ export default function RevenueChart({ data, loading }: RevenueChartProps) {
                 fontSize: 12,
               }}
               labelStyle={{ fontWeight: 600 }}
-              formatter={(value: number) => [value, 'Emergencias']}
+              formatter={(value: unknown) => [Number(value), 'Emergencias']}
             />
             <Legend
               iconType="circle"

@@ -2,11 +2,32 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Download, RefreshCw, BarChart2 } from 'lucide-react'
-import RevenueChart from '@/components/dashboard/RevenueChart'
+import { AlertTriangle, Ambulance, DollarSign, Clock } from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 import MetricCard from '@/components/dashboard/MetricCard'
 import api from '@/lib/axios'
-import { EmergencyByHour, DashboardMetrics } from '@/types'
-import { AlertTriangle, Ambulance, DollarSign, Clock } from 'lucide-react'
+import { DashboardMetrics, EmergencyByHour } from '@/types'
+
+interface RevenuePoint {
+  date: string
+  revenue: number
+  commission?: number
+}
+
+interface ResponseTimePoint {
+  date: string
+  avgMinutes: number
+}
 
 interface ReportData {
   totalEmergencies: number
@@ -26,27 +47,59 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
-  const [chartData, setChartData] = useState<EmergencyByHour[]>([])
+  const [revenueData, setRevenueData] = useState<RevenuePoint[]>([])
+  const [responseTimeData, setResponseTimeData] = useState<ResponseTimePoint[]>([])
 
   const fetchReport = useCallback(async () => {
     if (!dateFrom || !dateTo) return
     setLoading(true)
     try {
-      const [reportRes, chartRes] = await Promise.allSettled([
-        api.get<ReportData>('/admin/reports', { params: { from: dateFrom, to: dateTo } }),
-        api.get<EmergencyByHour[]>('/admin/emergencies/by-hour', { params: { from: dateFrom, to: dateTo } }),
+      const [revenueRes, responseTimesRes] = await Promise.allSettled([
+        api.get<RevenuePoint[] | { data: RevenuePoint[]; summary?: ReportData }>('/reports/revenue', {
+          params: { from: dateFrom, to: dateTo },
+        }),
+        api.get<ResponseTimePoint[] | { data: ResponseTimePoint[]; summary?: Partial<ReportData> }>('/reports/response-times', {
+          params: { from: dateFrom, to: dateTo },
+        }),
       ])
 
-      if (reportRes.status === 'fulfilled') {
-        setReportData(reportRes.value.data)
+      if (revenueRes.status === 'fulfilled') {
+        const raw = revenueRes.value.data
+        if (Array.isArray(raw)) {
+          setRevenueData(raw)
+          // Calcular summary a partir del array
+          const totalRevenue = raw.reduce((s, r) => s + (r.revenue ?? 0), 0)
+          setReportData((prev) => ({
+            totalEmergencies: prev?.totalEmergencies ?? 0,
+            completedEmergencies: prev?.completedEmergencies ?? 0,
+            cancelledEmergencies: prev?.cancelledEmergencies ?? 0,
+            avgResponseTime: prev?.avgResponseTime ?? 0,
+            byHour: prev?.byHour ?? [],
+            totalRevenue,
+          }))
+        } else {
+          setRevenueData((raw as { data: RevenuePoint[] }).data ?? [])
+          if ((raw as { summary?: ReportData }).summary) {
+            setReportData((raw as { summary: ReportData }).summary)
+          }
+        }
       } else {
-        setReportData(null)
+        setRevenueData([])
       }
 
-      if (chartRes.status === 'fulfilled') {
-        setChartData(chartRes.value.data)
+      if (responseTimesRes.status === 'fulfilled') {
+        const raw = responseTimesRes.value.data
+        if (Array.isArray(raw)) {
+          setResponseTimeData(raw)
+          if (raw.length > 0) {
+            const avg = raw.reduce((s, r) => s + (r.avgMinutes ?? 0), 0) / raw.length
+            setReportData((prev) => prev ? { ...prev, avgResponseTime: avg } : null)
+          }
+        } else {
+          setResponseTimeData((raw as { data: ResponseTimePoint[] }).data ?? [])
+        }
       } else {
-        setChartData([])
+        setResponseTimeData([])
       }
     } finally {
       setLoading(false)
@@ -57,23 +110,48 @@ export default function ReportsPage() {
     fetchReport()
   }, [fetchReport])
 
-  const handleExportCSV = async () => {
+  // Exportar CSV generado en el browser con los datos actuales
+  const handleExportCSV = () => {
     setExporting(true)
     try {
-      const response = await api.get('/admin/reports/export', {
-        params: { from: dateFrom, to: dateTo },
-        responseType: 'blob',
+      const rows: string[] = [
+        'Fecha,Ingresos (S/),Comisión AmbuGo (S/),Tiempo Respuesta Promedio (min)',
+      ]
+
+      // Combinar datos de revenue y response-times por fecha
+      const dateMap = new Map<string, { revenue: number; commission: number; avgMin: number }>()
+      revenueData.forEach((r) => {
+        dateMap.set(r.date, {
+          revenue: r.revenue ?? 0,
+          commission: r.commission ?? (r.revenue ?? 0) * 0.12,
+          avgMin: 0,
+        })
       })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      responseTimeData.forEach((r) => {
+        const existing = dateMap.get(r.date) ?? { revenue: 0, commission: 0, avgMin: 0 }
+        dateMap.set(r.date, { ...existing, avgMin: r.avgMinutes ?? 0 })
+      })
+
+      dateMap.forEach((val, date) => {
+        rows.push(
+          `${date},${val.revenue.toFixed(2)},${val.commission.toFixed(2)},${val.avgMin.toFixed(1)}`
+        )
+      })
+
+      if (rows.length === 1) {
+        rows.push(`${dateFrom} al ${dateTo},0.00,0.00,0.0`)
+      }
+
+      const csvContent = rows.join('\n')
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.setAttribute('download', `ambugoperú-reporte-${dateFrom}-${dateTo}.csv`)
+      link.setAttribute('download', `ambugo-reporte-${dateFrom}-${dateTo}.csv`)
       document.body.appendChild(link)
       link.click()
       link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch {
-      alert('No se pudo exportar el reporte. Inténtalo de nuevo.')
+      URL.revokeObjectURL(url)
     } finally {
       setExporting(false)
     }
@@ -223,8 +301,64 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {/* Gráfica */}
-          <RevenueChart data={chartData} loading={false} />
+          {/* Gráfica de ingresos por período */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-base font-semibold text-gray-800 mb-4">Ingresos por Período (S/)</h2>
+            {revenueData.length === 0 ? (
+              <div className="flex items-center justify-center h-52 text-sm text-gray-400">
+                Sin datos de ingresos para el período seleccionado
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={revenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }}
+                    formatter={(value: unknown) => [`S/ ${Number(value).toFixed(2)}`, 'Ingresos']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    name="Ingresos"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    fill="url(#colorRevenue)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Gráfica de tiempos de respuesta */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-base font-semibold text-gray-800 mb-4">Tiempos de Respuesta (minutos)</h2>
+            {responseTimeData.length === 0 ? (
+              <div className="flex items-center justify-center h-52 text-sm text-gray-400">
+                Sin datos de tiempos de respuesta para el período seleccionado
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={responseTimeData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }}
+                    formatter={(value: unknown) => [`${Number(value).toFixed(1)} min`, 'Tiempo promedio']}
+                  />
+                  <Bar dataKey="avgMinutes" name="Tiempo promedio" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex items-center justify-center py-16">

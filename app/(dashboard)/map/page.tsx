@@ -14,21 +14,28 @@ export default function MapPage() {
   const [emergencies, setEmergencies] = useState<Emergency[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Polling de posiciones cada 15 segundos
   useEffect(() => {
+    let pollInterval: ReturnType<typeof setInterval>
+
     const fetchData = async () => {
       try {
         const [ambRes, emgRes] = await Promise.allSettled([
-          api.get<{ data: AmbulanceType[] }>('/admin/ambulances', { params: { limit: 100 } }),
-          api.get<{ data: Emergency[] }>('/admin/emergencies', {
+          api.get<AmbulanceType[] | { data: AmbulanceType[] }>('/ambulances/nearby', {
+            params: { lat: -12.0464, lng: -77.0428, radius: 50000 },
+          }),
+          api.get<Emergency[] | { data: Emergency[] }>('/emergencies', {
             params: { status: 'pending,assigned,on_route,arrived', limit: 50 },
           }),
         ])
 
         if (ambRes.status === 'fulfilled') {
-          setAmbulances(ambRes.value.data.data ?? [])
+          const ambData = ambRes.value.data
+          setAmbulances(Array.isArray(ambData) ? ambData : (ambData as { data: AmbulanceType[] }).data ?? [])
         }
         if (emgRes.status === 'fulfilled') {
-          setEmergencies(emgRes.value.data.data ?? [])
+          const emgData = emgRes.value.data
+          setEmergencies(Array.isArray(emgData) ? emgData : (emgData as { data: Emergency[] }).data ?? [])
         }
       } finally {
         setLoading(false)
@@ -36,6 +43,7 @@ export default function MapPage() {
     }
 
     fetchData()
+    pollInterval = setInterval(fetchData, 15_000)
 
     // Configuración de WebSocket para tiempo real
     const socket = getTrackingSocket()
@@ -72,6 +80,7 @@ export default function MapPage() {
     })
 
     return () => {
+      clearInterval(pollInterval)
       socket.off('ambulance_location')
       socket.off('emergency_assigned')
       socket.off('status_change')

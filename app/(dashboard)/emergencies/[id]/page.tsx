@@ -2,11 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, MapPin, Clock, User, Ambulance as AmbulanceIcon, Phone } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { ArrowLeft, MapPin, Clock, User, Ambulance as AmbulanceIcon } from 'lucide-react'
 import EmergencyStatusBadge from '@/components/emergencies/EmergencyStatusBadge'
 import api from '@/lib/axios'
 import { Emergency } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils'
+
+// Mini mapa con react-leaflet — cargado sin SSR
+const MiniMap = dynamic(
+  () => import('@/components/map/MiniMap'),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full bg-gray-50 text-sm text-gray-400">Cargando mapa...</div> }
+)
 
 const STATUS_TIMELINE: { key: Emergency['status']; label: string }[] = [
   { key: 'pending', label: 'Pendiente' },
@@ -39,7 +46,7 @@ export default function EmergencyDetailPage() {
     const fetchEmergency = async () => {
       setLoading(true)
       try {
-        const { data } = await api.get<Emergency>(`/admin/emergencies/${id}`)
+        const { data } = await api.get<Emergency>(`/emergencies/${id}`)
         setEmergency(data)
       } catch {
         setError('No se pudo cargar la emergencia. Verifica que el ID sea correcto.')
@@ -141,8 +148,25 @@ export default function EmergencyDetailPage() {
       {isCancelled && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
           Esta emergencia fue cancelada.
+          {emergency.cancelReason && (
+            <span className="ml-1 font-medium">Motivo: {emergency.cancelReason}</span>
+          )}
         </div>
       )}
+
+      {/* Mini mapa de ubicación del usuario */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-orange-500" />
+          <h2 className="text-sm font-semibold text-gray-700">Ubicación de la emergencia</h2>
+          <span className="text-xs text-gray-400 ml-auto font-mono">
+            {emergency.userLat.toFixed(5)}, {emergency.userLng.toFixed(5)}
+          </span>
+        </div>
+        <div style={{ height: '300px' }}>
+          <MiniMap lat={emergency.userLat} lng={emergency.userLng} address={emergency.address} />
+        </div>
+      </div>
 
       {/* Detalles en grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -206,7 +230,36 @@ export default function EmergencyDetailPage() {
             <AmbulanceIcon className="w-4 h-4 text-orange-500" />
             Ambulancia asignada
           </h2>
-          {emergency.ambulanceId ? (
+          {emergency.ambulance ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Placa</span>
+                <span className="font-mono font-semibold text-gray-800">{emergency.ambulance.plate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Tipo</span>
+                <span className="text-gray-800">Tipo {emergency.ambulance.type}</span>
+              </div>
+              {emergency.ambulance.conductor && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Conductor</span>
+                  <span className="text-gray-800">{emergency.ambulance.conductor.name}</span>
+                </div>
+              )}
+              {emergency.ambulance.company && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Empresa</span>
+                  <span className="text-gray-800">{emergency.ambulance.company.name}</span>
+                </div>
+              )}
+              {emergency.estimatedArrivalMinutes != null && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">ETA</span>
+                  <span className="text-gray-800 font-medium">{emergency.estimatedArrivalMinutes} min</span>
+                </div>
+              )}
+            </div>
+          ) : emergency.ambulanceId ? (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">ID ambulancia</span>
@@ -225,14 +278,24 @@ export default function EmergencyDetailPage() {
             Tiempos y cobro
           </h2>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Tiempo estimado llegada</span>
-              <span className="text-gray-800">
-                {emergency.estimatedArrivalMinutes != null
-                  ? `${emergency.estimatedArrivalMinutes} min`
-                  : '—'}
-              </span>
-            </div>
+            {emergency.assignedAt && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Asignada</span>
+                <span className="text-gray-800">{formatDate(emergency.assignedAt)}</span>
+              </div>
+            )}
+            {emergency.arrivedAt && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Llegó al lugar</span>
+                <span className="text-gray-800">{formatDate(emergency.arrivedAt)}</span>
+              </div>
+            )}
+            {emergency.completedAt && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Completada</span>
+                <span className="text-gray-800">{formatDate(emergency.completedAt)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">Monto total</span>
               <span className="text-gray-800 font-semibold">
@@ -241,6 +304,18 @@ export default function EmergencyDetailPage() {
                   : '—'}
               </span>
             </div>
+            {emergency.platformFee != null && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Comisión AmbuGo (12%)</span>
+                <span className="text-orange-600 font-medium">{formatCurrency(emergency.platformFee)}</span>
+              </div>
+            )}
+            {emergency.discountApplied && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Descuento suscripción</span>
+                <span className="text-green-600 font-medium">20% aplicado</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

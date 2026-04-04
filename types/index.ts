@@ -16,10 +16,20 @@ export interface Emergency {
   userLat: number
   userLng: number
   address: string
+  notes?: string
   estimatedArrivalMinutes?: number
   totalAmount?: number
+  platformFee?: number
+  companyAmount?: number
+  discountApplied?: boolean
+  assignedAt?: string
+  arrivedAt?: string
+  completedAt?: string
+  cancelledAt?: string
+  cancelReason?: string
   createdAt: string
   user?: User
+  ambulance?: Ambulance
 }
 
 export interface Ambulance {

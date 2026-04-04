@@ -34,7 +34,7 @@ export default function AmbulancesPage() {
       const params: Record<string, string | number> = { page, limit }
       if (statusFilter !== 'all') params.status = statusFilter
 
-      const { data } = await api.get<PaginatedResponse<Ambulance>>('/admin/ambulances', { params })
+      const { data } = await api.get<PaginatedResponse<Ambulance>>('/ambulances', { params })
       setAmbulances(data.data ?? [])
       setTotal(data.total ?? 0)
     } catch {

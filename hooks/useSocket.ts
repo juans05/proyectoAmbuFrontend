@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import { getTrackingSocket } from '@/lib/socket'
 
@@ -11,31 +11,35 @@ interface UseSocketOptions {
 
 export function useTrackingSocket({ onAmbulanceLocation, onEmergencyUpdate }: UseSocketOptions = {}) {
   const socketRef = useRef<Socket | null>(null)
+  // useState asegura que el valor del socket sea reactivo y consistente con cada render
+  const [socket, setSocket] = useState<Socket | null>(null)
 
   useEffect(() => {
-    const socket = getTrackingSocket()
-    socketRef.current = socket
+    const sock = getTrackingSocket()
+    socketRef.current = sock
+    setSocket(sock)
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
     if (token) {
-      socket.auth = { token }
+      sock.auth = { token }
     }
 
-    socket.connect()
+    sock.connect()
 
     if (onAmbulanceLocation) {
-      socket.on('ambulance:location', onAmbulanceLocation)
+      sock.on('ambulance:location', onAmbulanceLocation)
     }
     if (onEmergencyUpdate) {
-      socket.on('emergency:update', onEmergencyUpdate)
+      sock.on('emergency:update', onEmergencyUpdate)
     }
 
     return () => {
-      if (onAmbulanceLocation) socket.off('ambulance:location', onAmbulanceLocation)
-      if (onEmergencyUpdate) socket.off('emergency:update', onEmergencyUpdate)
-      socket.disconnect()
+      if (onAmbulanceLocation) sock.off('ambulance:location', onAmbulanceLocation)
+      if (onEmergencyUpdate) sock.off('emergency:update', onEmergencyUpdate)
+      sock.disconnect()
+      setSocket(null)
     }
   }, [onAmbulanceLocation, onEmergencyUpdate])
 
-  return socketRef.current
+  return socket
 }
