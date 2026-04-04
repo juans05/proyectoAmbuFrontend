@@ -16,8 +16,6 @@ export default function MapPage() {
 
   // Polling de posiciones cada 15 segundos
   useEffect(() => {
-    let pollInterval: ReturnType<typeof setInterval>
-
     const fetchData = async () => {
       try {
         const [ambRes, emgRes] = await Promise.allSettled([
@@ -43,7 +41,7 @@ export default function MapPage() {
     }
 
     fetchData()
-    pollInterval = setInterval(fetchData, 15_000)
+    const pollInterval = setInterval(fetchData, 15_000)
 
     // getTrackingSocket() inyecta el token del localStorage en el handshake
     const socket = getTrackingSocket()
@@ -58,17 +56,17 @@ export default function MapPage() {
     }) => {
       setAmbulances(prev => prev.map(amb => 
         amb.id === data.ambulanceId 
-          ? { ...amb, locationLat: data.lat, locationLng: data.lng, status: (data.status as any) || amb.status }
+          ? { ...amb, locationLat: data.lat, locationLng: data.lng, status: (data.status ?? amb.status) as AmbulanceType['status'] }
           : amb
       ))
     })
 
     // Escuchar nuevas emergencias o cambios de estado
-    socket.on('emergency_assigned', (data: any) => {
-      fetchData() // Recargar para obtener datos completos de la nueva asignación
+    socket.on('emergency_assigned', () => {
+      fetchData()
     })
 
-    socket.on('status_change', (data: any) => {
+    socket.on('status_change', () => {
       fetchData()
     })
 

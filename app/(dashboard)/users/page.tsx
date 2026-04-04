@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
 import { User as UserIcon, Search, RefreshCw } from 'lucide-react'
 import api from '@/lib/axios'
 import { User, PaginatedResponse } from '@/types'
@@ -161,7 +162,7 @@ export default function UsersPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
                           {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 object-cover" />
+                            <Image src={user.avatarUrl} alt={user.name} width={32} height={32} className="object-cover" />
                           ) : (
                             <UserIcon className="w-4 h-4 text-orange-500" />
                           )}

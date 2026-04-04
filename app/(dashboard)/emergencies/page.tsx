@@ -35,7 +35,7 @@ export default function EmergenciesPage() {
       if (dateFrom) params.from = dateFrom
       if (dateTo) params.to = dateTo
 
-      const { data } = await api.get<PaginatedResponse<Emergency>>('/admin/emergencies', { params })
+      const { data } = await api.get<PaginatedResponse<Emergency>>('/emergencies', { params })
       setEmergencies(data.data ?? [])
       setTotal(data.total ?? 0)
     } catch {
