@@ -74,9 +74,8 @@ export default function DashboardPage() {
     }, 30_000)
 
     // WebSocket — actualización en tiempo real desde /tracking
+    // getTrackingSocket() inyecta el token del localStorage en el handshake
     const socket = getTrackingSocket()
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
-    if (token) socket.auth = { token }
     if (!socket.connected) socket.connect()
 
     // Cuando una emergencia es asignada o cambia estado, refrescar la lista

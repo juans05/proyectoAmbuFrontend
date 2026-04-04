@@ -45,16 +45,9 @@ export default function MapPage() {
     fetchData()
     pollInterval = setInterval(fetchData, 15_000)
 
-    // Configuración de WebSocket para tiempo real
+    // getTrackingSocket() inyecta el token del localStorage en el handshake
     const socket = getTrackingSocket()
-    
-    if (!socket.connected) {
-      const token = localStorage.getItem('accessToken')
-      if (token) {
-        socket.auth = { token }
-      }
-      socket.connect()
-    }
+    if (!socket.connected) socket.connect()
 
     // Escuchar actualizaciones de ubicación de ambulancias
     socket.on('ambulance_location', (data: { 
