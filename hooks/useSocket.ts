@@ -20,8 +20,10 @@ export function useTrackingSocket({ onAmbulanceLocation, onEmergencyUpdate }: Us
     setSocket(sock)
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
-    if (token) {
+    if (token && token !== 'undefined') {
       sock.auth = { token }
+    } else {
+      sock.auth = {}
     }
 
     sock.connect()

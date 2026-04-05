@@ -16,13 +16,26 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
 
   login: (token: string, user: User) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', token)
-      localStorage.setItem('user', JSON.stringify(user))
-      // Sincronizar cookie para que el middleware de Next.js pueda leerla
-      document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}` // 15 minutos
+    if (!token || token === 'undefined') {
+      console.error('Error: Intento de login con token inválido o undefined')
+      return
     }
-    set({ token, user, isAuthenticated: true })
+    console.log(user);
+    console.log(token);
+    if (typeof window !== 'undefined') {
+      if (token && token !== 'undefined') {
+        localStorage.setItem('accessToken', token)
+        localStorage.setItem('user', JSON.stringify(user))
+        // Sincronizar cookie para que el middleware de Next.js pueda leerla
+        document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}` // 15 minutos
+        set({ token, user, isAuthenticated: true })
+      } else {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('user')
+        document.cookie = 'accessToken=; path=/; max-age=0'
+        set({ token: null, user: null, isAuthenticated: false })
+      }
+    }
   },
 
   logout: () => {
@@ -38,6 +51,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialize: () => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('accessToken')
+
+      // Limpieza de emergencia para tokens malformados ("undefined" string)
+      if (token === 'undefined') {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('user')
+        document.cookie = 'accessToken=; path=/; max-age=0'
+        return
+      }
+
       const userStr = localStorage.getItem('user')
       if (token && userStr) {
         try {

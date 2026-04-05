@@ -8,10 +8,14 @@ export function getSocket(): Socket {
   if (!socket) {
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+    
+    // Sanitizar token para evitar el string "undefined"
+    const sanitizedToken = token && token !== 'undefined' ? token : null
+
     socket = io(process.env.NEXT_PUBLIC_API_URL!, {
       autoConnect: false,
       transports: ['websocket'],
-      auth: token ? { token } : undefined,
+      auth: sanitizedToken ? { token: sanitizedToken } : undefined,
     })
   }
   return socket
@@ -23,9 +27,12 @@ export function getSocket(): Socket {
  * y crea uno nuevo para que el handshake incluya las credenciales correctas.
  */
 export function getTrackingSocket(token?: string | null): Socket {
-  const resolvedToken =
+  let resolvedToken =
     token ??
     (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null)
+
+  // Sanitizar: si es el texto "undefined", tratar como null
+  if (resolvedToken === 'undefined') resolvedToken = null
 
   // Recrear si el token cambió (ej. nuevo login) o aún no existe
   if (trackingSocket && resolvedToken !== trackingSocketToken) {
@@ -51,7 +58,7 @@ export function connectSocket(): void {
     typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
   const s = getSocket()
   if (!s.connected) {
-    if (token) s.auth = { token }
+    if (token && token !== 'undefined') s.auth = { token }
     s.connect()
   }
 }

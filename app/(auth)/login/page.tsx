@@ -29,6 +29,7 @@ export default function LoginPage() {
 
     try {
       const { data } = await api.post<LoginResponse>('/auth/login', { email, password })
+      console.log('LoginPage: Login success, token received:', data.accessToken ? `${data.accessToken.substring(0, 10)}...` : 'undefined')
       login(data.accessToken, data.user)
       router.push('/dashboard')
     } catch (err: unknown) {

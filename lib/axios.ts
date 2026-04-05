@@ -5,27 +5,30 @@ const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL })
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('accessToken')
-    if (token) config.headers.Authorization = `Bearer ${token}`
+    if (token && token !== 'undefined') {
+      console.log('Axios: Setting Authorization header', `${token.substring(0, 10)}...`)
+      config.headers.Authorization = `Bearer ${token}`
+    } else {
+      console.log('Axios: No token found in localStorage for request')
+    }
   }
   return config
 })
 
 api.interceptors.response.use(
   (response) => {
-    // Unwrap TransformInterceptor envelope: { data, statusCode, timestamp } → data
-    if (
-      response.data &&
-      typeof response.data === 'object' &&
-      'data' in response.data &&
-      'statusCode' in response.data &&
-      'timestamp' in response.data
-    ) {
-      response.data = response.data.data
+    // Unwrap TransformInterceptor envelope safely
+    const data = response.data
+    if (data && typeof data === 'object' && 'data' in data && 'statusCode' in data) {
+      console.log('Axios: Unwrapping response data', data.data)
+      response.data = data.data
     }
 
     // Guardar accessToken en cookie cuando el backend lo devuelve (login / refresh)
-    if (typeof window !== 'undefined' && response.data?.accessToken) {
-      document.cookie = `accessToken=${response.data.accessToken}; path=/; max-age=${15 * 60}`
+    const token = response.data?.accessToken || (response.data as any)?.data?.accessToken
+    if (typeof window !== 'undefined' && token && token !== 'undefined') {
+      console.log('Axios: Saving token to cookie', typeof token === 'string' ? `${token.substring(0, 10)}...` : 'INVALID TYPE')
+      document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}`
     }
     return response
   },
