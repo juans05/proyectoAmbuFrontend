@@ -59,6 +59,7 @@ export default function MapPage() {
       lng: number;
       status?: string;
     }) => {
+      console.log(`[SOCKET] Nueva ubicación recibida: ID=${data.ambulanceId} Lat=${data.lat} Lng=${data.lng}`);
       setAmbulances(prev => prev.map(amb => 
         amb.id === data.ambulanceId 
           ? { ...amb, locationLat: data.lat, locationLng: data.lng, status: (data.status ?? amb.status) as AmbulanceType['status'] }
