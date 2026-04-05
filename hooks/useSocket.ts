@@ -12,12 +12,13 @@ interface UseSocketOptions {
 export function useTrackingSocket({ onAmbulanceLocation, onEmergencyUpdate }: UseSocketOptions = {}) {
   const socketRef = useRef<Socket | null>(null)
   // useState asegura que el valor del socket sea reactivo y consistente con cada render
-  const [socket, setSocket] = useState<Socket | null>(null)
+  // Usamos el inicializador para evitar el error de lint de "set state inside effect"
+  const [socket, setSocket] = useState<Socket | null>(() => getTrackingSocket())
 
   useEffect(() => {
-    const sock = getTrackingSocket()
+    const sock = socket
+    if (!sock) return
     socketRef.current = sock
-    setSocket(sock)
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
     if (token && token !== 'undefined') {
@@ -56,7 +57,7 @@ export function useTrackingSocket({ onAmbulanceLocation, onEmergencyUpdate }: Us
       sock.disconnect()
       setSocket(null)
     }
-  }, [onAmbulanceLocation, onEmergencyUpdate])
+  }, [socket, onAmbulanceLocation, onEmergencyUpdate])
 
   return socket
 }

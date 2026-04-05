@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { Ambulance as AmbulanceType, Emergency } from '@/types'
 import api from '@/lib/axios'
@@ -14,33 +14,37 @@ export default function MapPage() {
   const [emergencies, setEmergencies] = useState<Emergency[]>([])
   const [loading, setLoading] = useState(true)
 
+  const fetchData = useCallback(async () => {
+    try {
+      const [ambRes, emgRes] = await Promise.allSettled([
+        api.get<AmbulanceType[] | { data: AmbulanceType[] }>('/ambulances', {
+          params: { limit: 100 },
+        }),
+        api.get<Emergency[] | { data: Emergency[] }>('/emergencies', {
+          params: { status: 'pending,assigned,on_route,arrived', limit: 50 },
+        }),
+      ])
+
+      if (ambRes.status === 'fulfilled') {
+        const ambData = ambRes.value.data
+        // Soportar tanto arreglo simple como objeto paginado { data: [], meta: {} }
+        if (Array.isArray(ambData)) {
+          setAmbulances(ambData)
+        } else if (ambData && 'data' in ambData) {
+          setAmbulances(ambData.data || [])
+        }
+      }
+      if (emgRes.status === 'fulfilled') {
+        const emgData = emgRes.value.data
+        setEmergencies(Array.isArray(emgData) ? emgData : (emgData as { data: Emergency[] }).data ?? [])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   // Polling de posiciones cada 15 segundos
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ambRes, emgRes] = await Promise.allSettled([
-          api.get<AmbulanceType[] | { data: AmbulanceType[] }>('/ambulances', {
-            params: { limit: 100 },
-          }),
-          api.get<Emergency[] | { data: Emergency[] }>('/emergencies', {
-            params: { status: 'pending,assigned,on_route,arrived', limit: 50 },
-          }),
-        ])
-
-        if (ambRes.status === 'fulfilled') {
-          const ambData = ambRes.value.data
-          // Soportar tanto arreglo simple como objeto paginado { data: [], meta: {} }
-          setAmbulances(Array.isArray(ambData) ? ambData : (ambData as any).data ?? [])
-        }
-        if (emgRes.status === 'fulfilled') {
-          const emgData = emgRes.value.data
-          setEmergencies(Array.isArray(emgData) ? emgData : (emgData as { data: Emergency[] }).data ?? [])
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchData()
     const pollInterval = setInterval(fetchData, 15_000)
 
@@ -77,7 +81,7 @@ export default function MapPage() {
       socket.off('emergency_assigned')
       socket.off('status_change')
     }
-  }, [])
+  }, [fetchData])
 
   return (
     <div className="flex flex-col h-full space-y-4">

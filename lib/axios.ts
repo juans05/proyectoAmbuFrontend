@@ -25,7 +25,9 @@ api.interceptors.response.use(
     }
 
     // Guardar accessToken en cookie cuando el backend lo devuelve (login / refresh)
-    const token = response.data?.accessToken || (response.data as any)?.data?.accessToken
+    const token = (response.data as { accessToken?: string })?.accessToken || 
+                  (response.data as { data?: { accessToken?: string } })?.data?.accessToken;
+    
     if (typeof window !== 'undefined' && token && token !== 'undefined') {
       console.log('Axios: Saving token to cookie', typeof token === 'string' ? `${token.substring(0, 10)}...` : 'INVALID TYPE')
       document.cookie = `accessToken=${token}; path=/; max-age=${15 * 60}`
