@@ -27,17 +27,32 @@ export function useTrackingSocket({ onAmbulanceLocation, onEmergencyUpdate }: Us
     }
 
     sock.connect()
+    
+    // Manejo de errores de autenticación (ej. jwt expired)
+    sock.on('connect_error', (error) => {
+      console.error('Socket Connection Error:', error.message)
+      if (error.message === 'jwt expired' || error.message === 'Unauthorized' || error.message === 'invalid token') {
+        if (typeof window !== 'undefined') {
+          console.warn('Socket Auth Error: Sesión expirada. Limpiando localStorage...')
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('user')
+          document.cookie = 'accessToken=; path=/; max-age=0'
+          window.location.href = '/login'
+        }
+      }
+    })
 
     if (onAmbulanceLocation) {
-      sock.on('ambulance:location', onAmbulanceLocation)
+      sock.on('ambulance_location', onAmbulanceLocation)
     }
     if (onEmergencyUpdate) {
       sock.on('emergency:update', onEmergencyUpdate)
     }
 
     return () => {
-      if (onAmbulanceLocation) sock.off('ambulance:location', onAmbulanceLocation)
+      if (onAmbulanceLocation) sock.off('ambulance_location', onAmbulanceLocation)
       if (onEmergencyUpdate) sock.off('emergency:update', onEmergencyUpdate)
+      sock.off('connect_error')
       sock.disconnect()
       setSocket(null)
     }

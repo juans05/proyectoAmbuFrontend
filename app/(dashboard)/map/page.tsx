@@ -19,8 +19,8 @@ export default function MapPage() {
     const fetchData = async () => {
       try {
         const [ambRes, emgRes] = await Promise.allSettled([
-          api.get<AmbulanceType[] | { data: AmbulanceType[] }>('/ambulances/nearby', {
-            params: { lat: -12.0464, lng: -77.0428, radius: 50000 },
+          api.get<AmbulanceType[] | { data: AmbulanceType[] }>('/ambulances', {
+            params: { limit: 100 },
           }),
           api.get<Emergency[] | { data: Emergency[] }>('/emergencies', {
             params: { status: 'pending,assigned,on_route,arrived', limit: 50 },
@@ -29,7 +29,8 @@ export default function MapPage() {
 
         if (ambRes.status === 'fulfilled') {
           const ambData = ambRes.value.data
-          setAmbulances(Array.isArray(ambData) ? ambData : (ambData as { data: AmbulanceType[] }).data ?? [])
+          // Soportar tanto arreglo simple como objeto paginado { data: [], meta: {} }
+          setAmbulances(Array.isArray(ambData) ? ambData : (ambData as any).data ?? [])
         }
         if (emgRes.status === 'fulfilled') {
           const emgData = emgRes.value.data
