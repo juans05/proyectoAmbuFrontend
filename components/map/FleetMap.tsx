@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -43,16 +43,9 @@ const ambulanceIcons = {
 
 const emergencyIcon = createColoredIcon('#2563eb')  // blue
 
-interface AmbulanceLocation {
-  ambulanceId: string
-  lat: number
-  lng: number
-}
-
 interface FleetMapProps {
   ambulances: Ambulance[]
   emergencies: Emergency[]
-  locationUpdates?: AmbulanceLocation[]
 }
 
 function MapBounds() {
@@ -63,15 +56,7 @@ function MapBounds() {
   return null
 }
 
-export default function FleetMap({ ambulances, emergencies, locationUpdates = [] }: FleetMapProps) {
-  const [ambulancePositions, setAmbulancePositions] = useState<Record<string, { lat: number; lng: number }>>({})
-
-  useEffect(() => {
-    locationUpdates.forEach(({ ambulanceId, lat, lng }) => {
-      setAmbulancePositions((prev) => ({ ...prev, [ambulanceId]: { lat, lng } }))
-    })
-  }, [locationUpdates])
-
+export default function FleetMap({ ambulances, emergencies }: FleetMapProps) {
   return (
     <MapContainer
       center={[-12.0464, -77.0428]}
@@ -85,11 +70,10 @@ export default function FleetMap({ ambulances, emergencies, locationUpdates = []
       />
       <MapBounds />
 
-      {/* Ambulance markers */}
+      {/* Ambulance markers — lat/lng actualizados en tiempo real desde MapPage vía socket */}
       {ambulances.map((amb) => {
-        const pos = ambulancePositions[amb.id]
-        const lat = pos?.lat ?? amb.locationLat
-        const lng = pos?.lng ?? amb.locationLng
+        const lat = amb.locationLat
+        const lng = amb.locationLng
         if (!lat || !lng) return null
 
         return (
