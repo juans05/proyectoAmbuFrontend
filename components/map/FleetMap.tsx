@@ -106,6 +106,9 @@ export default function FleetMap({ ambulances, emergencies }: FleetMapProps) {
                       : 'Offline'}
                   </span>
                 </p>
+                {amb.locationAltitude !== undefined && (
+                  <p className="text-gray-600">Altitud: {amb.locationAltitude.toFixed(1)}m</p>
+                )}
                 {amb.conductor && (
                   <p className="text-gray-600">Conductor: {amb.conductor.name}</p>
                 )}

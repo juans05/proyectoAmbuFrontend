@@ -15,6 +15,7 @@ export interface Emergency {
   type: string
   userLat: number
   userLng: number
+  userAltitude?: number
   address: string
   notes?: string
   estimatedArrivalMinutes?: number
@@ -39,6 +40,7 @@ export interface Ambulance {
   status: 'available' | 'on_route' | 'busy' | 'offline'
   locationLat?: number
   locationLng?: number
+  locationAltitude?: number
   companyId: string
   conductorId?: string
   conductor?: User
