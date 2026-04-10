@@ -9,9 +9,18 @@ import { getTrackingSocket } from '@/lib/socket'
 // FleetMap usa Leaflet que no soporta SSR
 const FleetMap = dynamic(() => import('@/components/map/FleetMap'), { ssr: false })
 
+interface TrafficSignal {
+  id: string
+  lat: number
+  lng: number
+  name?: string
+}
+
 export default function MapPage() {
   const [ambulances, setAmbulances] = useState<AmbulanceType[]>([])
   const [emergencies, setEmergencies] = useState<Emergency[]>([])
+  const [trafficSignals, setTrafficSignals] = useState<TrafficSignal[]>([])
+  const [activePriorityIds, setActivePriorityIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
@@ -52,20 +61,59 @@ export default function MapPage() {
     const socket = getTrackingSocket()
     if (!socket.connected) socket.connect()
 
+    // Timer para auto-limpiar activePriorityIds después de 30 segundos
+    let priorityTimeout: ReturnType<typeof setTimeout> | null = null
+
     // Escuchar actualizaciones de ubicación de ambulancias
-    socket.on('ambulance_location', (data: { 
-      ambulanceId: string; 
-      lat: number; 
+    socket.on('ambulance_location', (data: {
+      ambulanceId: string;
+      lat: number;
       lng: number;
       altitude?: number;
       status?: string;
     }) => {
       console.log(`[SOCKET] Nueva ubicación: ID=${data.ambulanceId} Lat=${data.lat} Lng=${data.lng} Alt=${data.altitude}`);
-      setAmbulances(prev => prev.map(amb => 
-        amb.id === data.ambulanceId 
+      setAmbulances(prev => prev.map(amb =>
+        amb.id === data.ambulanceId
           ? { ...amb, locationLat: data.lat, locationLng: data.lng, locationAltitude: data.altitude, status: (data.status ?? amb.status) as AmbulanceType['status'] }
           : amb
       ))
+    })
+
+    // Escuchar evento de prioridad de semáforos — ChuyaNam Priority Engine
+    socket.on('traffic_priority_active', (data: {
+      signalIds?: string[]
+      signals?: TrafficSignal[]
+    }) => {
+      console.log(`[SOCKET] traffic_priority_active: IDs=${data.signalIds}, Signals=${data.signals?.length ?? 0}`)
+
+      // Actualizar señales de tráfico si vienen en el payload
+      if (data.signals && Array.isArray(data.signals)) {
+        setTrafficSignals(prev => {
+          const newSignals = [...prev]
+          data.signals!.forEach(signal => {
+            const idx = newSignals.findIndex(s => s.id === signal.id)
+            if (idx >= 0) {
+              newSignals[idx] = signal
+            } else {
+              newSignals.push(signal)
+            }
+          })
+          return newSignals
+        })
+      }
+
+      // Actualizar IDs activos
+      if (data.signalIds && Array.isArray(data.signalIds)) {
+        setActivePriorityIds(data.signalIds)
+
+        // Reset del timer de auto-limpieza
+        if (priorityTimeout) clearTimeout(priorityTimeout)
+        priorityTimeout = setTimeout(() => {
+          setActivePriorityIds([])
+          console.log('[SOCKET] traffic_priority_active timeout — resetting')
+        }, 30_000)
+      }
     })
 
     // Escuchar nuevas emergencias o cambios de estado
@@ -79,9 +127,11 @@ export default function MapPage() {
 
     return () => {
       clearInterval(pollInterval)
+      if (priorityTimeout) clearTimeout(priorityTimeout)
       socket.off('ambulance_location')
       socket.off('emergency_assigned')
       socket.off('status_change')
+      socket.off('traffic_priority_active')
     }
   }, [fetchData])
 
@@ -127,7 +177,12 @@ export default function MapPage() {
             </div>
           </div>
         ) : (
-          <FleetMap ambulances={ambulances} emergencies={emergencies} />
+          <FleetMap
+            ambulances={ambulances}
+            emergencies={emergencies}
+            trafficSignals={trafficSignals}
+            activePriorityIds={activePriorityIds}
+          />
         )}
       </div>
 

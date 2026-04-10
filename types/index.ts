@@ -28,6 +28,7 @@ export interface Emergency {
   completedAt?: string
   cancelledAt?: string
   cancelReason?: string
+  suggestedRoutePolyline?: string
   createdAt: string
   user?: User
   ambulance?: Ambulance
