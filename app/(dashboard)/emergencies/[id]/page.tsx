@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { ArrowLeft, MapPin, Clock, User, Ambulance as AmbulanceIcon } from 'lucide-react'
 import EmergencyStatusBadge from '@/components/emergencies/EmergencyStatusBadge'
 import api from '@/lib/axios'
+import { getTrackingSocket } from '@/lib/socket'
 import { Emergency } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
@@ -38,6 +39,7 @@ export default function EmergencyDetailPage() {
   const id = params.id as string
 
   const [emergency, setEmergency] = useState<Emergency | null>(null)
+  const [ambulancePos, setAmbulancePos] = useState<{ lat: number, lng: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,6 +58,34 @@ export default function EmergencyDetailPage() {
     }
     fetchEmergency()
   }, [id])
+
+  // WebSocket para tracking en tiempo real
+  useEffect(() => {
+    if (!id || !emergency) return
+
+    const socket = getTrackingSocket()
+    if (!socket.connected) socket.connect()
+
+    socket.emit('join_emergency', { emergencyId: id })
+
+    socket.on('ambulance_location', (data: { ambulanceId: string, lat: number, lng: number }) => {
+      // Solo actualizar si es la ambulancia asignada a esta emergencia
+      if (emergency.ambulanceId === data.ambulanceId) {
+        setAmbulancePos({ lat: data.lat, lng: data.lng })
+      }
+    })
+
+    socket.on('status_change', () => {
+      // Refrescar datos si cambia el estado
+      api.get<Emergency>(`/emergencies/${id}`).then(({ data }) => setEmergency(data))
+    })
+
+    return () => {
+      socket.emit('leave_emergency', { emergencyId: id })
+      socket.off('ambulance_location')
+      socket.off('status_change')
+    }
+  }, [id, emergency?.ambulanceId])
 
   if (loading) {
     return (
@@ -164,7 +194,12 @@ export default function EmergencyDetailPage() {
           </span>
         </div>
         <div style={{ height: '300px' }}>
-          <MiniMap lat={emergency.userLat} lng={emergency.userLng} address={emergency.address} />
+          <MiniMap 
+            lat={emergency.userLat} 
+            lng={emergency.userLng} 
+            address={emergency.address} 
+            ambulance={ambulancePos}
+          />
         </div>
       </div>
 
