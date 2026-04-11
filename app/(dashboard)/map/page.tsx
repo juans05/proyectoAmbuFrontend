@@ -118,8 +118,21 @@ export default function MapPage() {
 
     // Escuchar nuevas emergencias o cambios de estado
     socket.on('emergency_assigned', () => {
-      fetchData()
-    })
+      console.log('[SOCKET] Nueva emergencia asignada — Activando alerta visual');
+      setNewEmergencyAlert(true);
+      fetchData();
+      
+      // Auto-limpiar el parpadeo después de 5 segundos
+      setTimeout(() => setNewEmergencyAlert(false), 5000);
+      
+      // Opcional: Sonido de alerta (usando beep nativo si el navegador lo permite o un audio simple)
+      try {
+        const audio = new Audio('/sounds/emergency.mp3');
+        audio.play().catch(() => console.log('Autoplay bloqueado: El usuario debe interactuar con la web primero.'));
+      } catch (e) {
+        // Ignorar falla de audio
+      }
+    });
 
     socket.on('status_change', () => {
       fetchData()
@@ -135,8 +148,19 @@ export default function MapPage() {
     }
   }, [fetchData])
 
+  const [newEmergencyAlert, setNewEmergencyAlert] = useState(false);
+
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className={`flex flex-col h-full space-y-4 transition-all duration-300 ${newEmergencyAlert ? 'ring-8 ring-red-500 ring-inset animate-pulse p-2 bg-red-50' : ''}`}>
+      {newEmergencyAlert && (
+          <div className="fixed top-4 right-4 z-[9999] bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce">
+            <span className="text-xl">🚨</span>
+            <div>
+              <p className="font-bold">NUEVA EMERGENCIA ASIGNADA</p>
+              <p className="text-xs opacity-90">Verifica la flota en el mapa</p>
+            </div>
+          </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Mapa de Flota en Tiempo Real</h1>
